@@ -1,10 +1,23 @@
+import re
+
 from .common import InfoExtractor
-from ..utils import get_element_by_id, traverse_obj
-import json
+from ..utils import get_element_by_id, traverse_obj, get_elements_html_by_class, extract_attributes
 
 
-class HotmartEmbedIE(InfoExtractor):
-    _VALID_URL = r'https?://player\.hotmart\.com/embed/(?P<id>[a-zA-Z0-9]+)'
+class HotmartIE(InfoExtractor):
+    _VALID_EMBED_BASE_URL = r'player\.hotmart\.com/embed/(?P<id>[a-zA-Z0-9]+)'
+    _VALID_EMBED_URL = r'https?://%s' % _VALID_EMBED_BASE_URL
+    _VALID_BASE_API_URL = r'[^/]+/api/v2/hotmart/private_video\?attachment_id=(?P<attachment_id>\d+)'
+    _VALID_API_URL = r'https?://%s' % _VALID_BASE_API_URL
+    _VALID_URL = r'''(?x)
+        https?://
+            (?:%s|%s)
+        ''' % (_VALID_EMBED_BASE_URL, _VALID_BASE_API_URL)
+    _EMBED_REGEX = [
+        r'''(?x)
+            <iframe[^>]+?src=["\']
+            (?P<url>%s)
+            ''' % _VALID_EMBED_URL]
     _TESTS = [{
         'url': 'https://yourextractor.com/watch/42',
         'md5': 'TODO: md5 sum of the first 10241 bytes of the video file (use --test)',
@@ -21,7 +34,41 @@ class HotmartEmbedIE(InfoExtractor):
         }
     }]
 
+    @classmethod
+    def _extract_embed_urls(cls, url, webpage):
+        base_url = re.search(r'https?://(?P<url>[^/]+)', url).group('url')
+        urls = list(super()._extract_embed_urls(url, webpage))
+
+        # Original analysis here: https://github.com/yt-dlp/yt-dlp/issues/3564#issuecomment-1146929281
+
+        # If this fails someone needs to find the new location of the data-attachment-id to give to API
+        #  ... or the user doesn't have access to the lecture -- using older code to detect this
+        container_elements = get_elements_html_by_class('hotmart_video_player', webpage)
+        for container_element in container_elements:
+            # If this fails the API might use a different method of getting the hotmart video than the attachment-id
+            container_attributes = extract_attributes(container_element)
+            attachment_id = container_attributes['data-attachment-id']
+
+            # Currently holds no security and will return good data to construct video link for any valid attachment-id,
+            #  else a 404
+            urls.append(f'https://{base_url}/api/v2/hotmart/private_video?attachment_id={attachment_id}')
+
+        return urls
+
     def _real_extract(self, url):
+        api_url_match = re.match(self._VALID_API_URL, url)
+        if api_url_match:
+            # Not adding error checking for video_id, signature, and teachable_application_key
+            #  because they seem to always be there unless there's the 404
+            # Tested one includes status: "READY", and upload_retries_cap_reached: false as well
+            attachment_id = api_url_match.group('attachment_id')
+            # Use attachment-id as video_id for now
+            video_url_data = self._download_json(url, attachment_id)
+
+            url = (f'https://player.hotmart.com/embed/{video_url_data["video_id"]}?'
+                   f'signature={video_url_data["signature"]}&'
+                   f'token={video_url_data["teachable_application_key"]}')
+
         video_id = self._match_id(url)
 
         webpage = self._download_webpage(url, video_id)
@@ -35,7 +82,6 @@ class HotmartEmbedIE(InfoExtractor):
         thumbnail_url = traverse_obj(video_data, ('props', 'pageProps', 'applicationData', 'urlThumbnail'))
 
         formats, subtitles = self._extract_m3u8_formats_and_subtitles(url, video_id, 'mp4')
-        self._sort_formats(formats)
 
         return {
             'id': video_id,

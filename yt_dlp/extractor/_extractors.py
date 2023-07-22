@@ -757,7 +757,7 @@ from .hollywoodreporter import (
     HollywoodReporterPlaylistIE,
 )
 from .holodex import HolodexIE
-from .hotmart import HotmartEmbedIE
+from .hotmart import HotmartIE
 from .hotnewhiphop import HotNewHipHopIE
 from .hotstar import (
     HotStarIE,
