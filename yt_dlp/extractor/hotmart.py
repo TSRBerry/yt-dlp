@@ -18,21 +18,21 @@ class HotmartIE(InfoExtractor):
             <iframe[^>]+?src=["\']
             (?P<url>%s)
             ''' % _VALID_EMBED_URL]
-    _TESTS = [{
-        'url': 'https://yourextractor.com/watch/42',
-        'md5': 'TODO: md5 sum of the first 10241 bytes of the video file (use --test)',
-        'info_dict': {
-            'id': '42',
-            'ext': 'mp4',
-            'title': 'Video title goes here',
-            'thumbnail': r're:^https?://.*\.jpg$',
-            # TODO more properties, either as:
-            # * A value
-            # * MD5 checksum; start the string with md5:
-            # * A regular expression; start the string with re:
-            # * Any Python type (for example int or float)
-        }
-    }]
+    # _TESTS = [{
+    #     'url': 'https://yourextractor.com/watch/42',
+    #     'md5': 'TODO: md5 sum of the first 10241 bytes of the video file (use --test)',
+    #     'info_dict': {
+    #         'id': '42',
+    #         'ext': 'mp4',
+    #         'title': 'Video title goes here',
+    #         'thumbnail': r're:^https?://.*\.jpg$',
+    #         # TODO more properties, either as:
+    #         # * A value
+    #         # * MD5 checksum; start the string with md5:
+    #         # * A regular expression; start the string with re:
+    #         # * Any Python type (for example int or float)
+    #     }
+    # }]
 
     @classmethod
     def _extract_embed_urls(cls, url, webpage):
@@ -61,8 +61,9 @@ class HotmartIE(InfoExtractor):
             # Not adding error checking for video_id, signature, and teachable_application_key
             #  because they seem to always be there unless there's the 404
             # Tested one includes status: "READY", and upload_retries_cap_reached: false as well
-            attachment_id = api_url_match.group('attachment_id')
+
             # Use attachment-id as video_id for now
+            attachment_id = api_url_match.group('attachment_id')
             video_url_data = self._download_json(url, attachment_id)
 
             url = (f'https://player.hotmart.com/embed/{video_url_data["video_id"]}?'
